@@ -1,0 +1,5 @@
+mod in_memory_lifecycle_repository;
+mod in_memory_object_repository;
+
+pub use in_memory_lifecycle_repository::InMemoryLifecycleRepository;
+pub use in_memory_object_repository::InMemoryObjectRepository;
