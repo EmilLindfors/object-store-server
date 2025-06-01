@@ -1,9 +1,23 @@
 [package]
 name = "object-store-server"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[[bin]]
+name = "object-store-server"
+path = "src/bin/server/main.rs"
+
+[[bin]]
+name = "object-store-cli"
+path = "src/bin/cli/main.rs"
+
+[features]
+default = []
 
 [dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+anyhow = "1.0"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "uuid", "chrono", "json"] }
 object_store = { version = "0.12", features = ["aws"] }
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }

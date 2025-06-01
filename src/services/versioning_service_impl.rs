@@ -192,7 +192,7 @@ impl VersioningService for VersioningServiceImpl {
 
         // Delete from store
         self.store
-            .delete_version(&request.key, &request.version_id)
+            .delete_object_version(&request.key, &request.version_id)
             .await?;
 
         Ok(DeleteVersionResult {
@@ -296,10 +296,13 @@ impl VersioningService for VersioningServiceImpl {
         source_version: &VersionId,
         destination_key: &ObjectKey,
     ) -> StorageResult<VersionId> {
-        // Use the versioned store's copy_version method
-        self.store
-            .copy_version(source_key, source_version, destination_key)
-            .await
+        // Use the versioned store's copy_object_version method
+        let object_info = self.store
+            .copy_object_version(source_key, source_version, destination_key)
+            .await?;
+        
+        // Extract version ID from the result
+        Ok(VersionId::new(object_info.version_id.unwrap_or_else(|| "latest".to_string())).unwrap())
     }
 
     /// Check if a specific version exists

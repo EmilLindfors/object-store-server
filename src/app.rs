@@ -3,15 +3,22 @@ use std::sync::Arc;
 
 use crate::{
     adapters::outbound::{
-        persistence::{InMemoryLifecycleRepository, InMemoryObjectRepository},
-        storage::{ApacheObjectStoreAdapter, VersionedApacheObjectStoreAdapter},
+        persistence::{
+            InMemoryLifecycleRepository, InMemoryObjectRepository,
+            SqlLifecycleRepository, SqlObjectRepository,
+        },
+        storage::{
+            S3ObjectStoreAdapter, VersionedS3ObjectStoreAdapter, S3Config, create_s3_store,
+        },
     },
+    domain::value_objects::BucketName,
     ports::{
         repositories::{LifecycleRepository, ObjectRepository},
         storage::{ObjectStore, VersionedObjectStore},
     },
     services::{LifecycleServiceImpl, ObjectServiceImpl, VersioningServiceImpl},
 };
+use sqlx::PgPool;
 
 /// Configuration for the application
 #[derive(Debug, Clone)]
@@ -151,10 +158,21 @@ impl AppBuilder {
         match &self.config.storage_backend {
             StorageBackend::InMemory => {
                 let store = Arc::new(InMemory::new());
-                let adapter = Arc::new(ApacheObjectStoreAdapter::new(store.clone()));
-                let versioned_adapter = Arc::new(VersionedApacheObjectStoreAdapter::new(store));
+                
+                // Use a fake bucket name for in-memory storage
+                let bucket_name = BucketName::new("test-bucket".to_string())
+                    .map_err(|e| AppError::Configuration {
+                        message: format!("Invalid bucket name: {}", e),
+                    })?;
+
+                let adapter = Arc::new(S3ObjectStoreAdapter::new(store.clone(), bucket_name));
+                let versioned_adapter = Arc::new(VersionedS3ObjectStoreAdapter::new(
+                    adapter.clone(),
+                    store,
+                ));
+
                 Ok((
-                    adapter.clone() as Arc<dyn ObjectStore>,
+                    adapter as Arc<dyn ObjectStore>,
                     versioned_adapter as Arc<dyn VersionedObjectStore>,
                 ))
             }
@@ -164,12 +182,32 @@ impl AppBuilder {
                 access_key,
                 secret_key,
             } => {
-                // In a real implementation, create S3 store here
-                let store = Arc::new(InMemory::new()); // Fallback for now
-                let adapter = Arc::new(ApacheObjectStoreAdapter::new(store.clone()));
-                let versioned_adapter = Arc::new(VersionedApacheObjectStoreAdapter::new(store));
+                let config = S3Config {
+                    bucket: bucket.clone(),
+                    region: region.clone(),
+                    access_key: access_key.clone(),
+                    secret_key: secret_key.clone(),
+                    endpoint: None,
+                };
+
+                let store = create_s3_store(config)
+                    .map_err(|e| AppError::StorageInit {
+                        message: format!("Failed to create S3 store: {}", e),
+                    })?;
+
+                let bucket_name = BucketName::new(bucket.clone())
+                    .map_err(|e| AppError::Configuration {
+                        message: format!("Invalid bucket name: {}", e),
+                    })?;
+
+                let adapter = Arc::new(S3ObjectStoreAdapter::new(store.clone(), bucket_name));
+                let versioned_adapter = Arc::new(VersionedS3ObjectStoreAdapter::new(
+                    adapter.clone(),
+                    store,
+                ));
+
                 Ok((
-                    adapter.clone() as Arc<dyn ObjectStore>,
+                    adapter as Arc<dyn ObjectStore>,
                     versioned_adapter as Arc<dyn VersionedObjectStore>,
                 ))
             }
@@ -180,12 +218,32 @@ impl AppBuilder {
                 secret_key,
                 use_ssl,
             } => {
-                // In a real implementation, create MinIO store here
-                let store = Arc::new(InMemory::new()); // Fallback for now
-                let adapter = Arc::new(ApacheObjectStoreAdapter::new(store.clone()));
-                let versioned_adapter = Arc::new(VersionedApacheObjectStoreAdapter::new(store));
+                let config = S3Config {
+                    bucket: bucket.clone(),
+                    region: "us-east-1".to_string(), // MinIO doesn't care about region
+                    access_key: Some(access_key.clone()),
+                    secret_key: Some(secret_key.clone()),
+                    endpoint: Some(endpoint.clone()),
+                };
+
+                let store = create_s3_store(config)
+                    .map_err(|e| AppError::StorageInit {
+                        message: format!("Failed to create MinIO store: {}", e),
+                    })?;
+
+                let bucket_name = BucketName::new(bucket.clone())
+                    .map_err(|e| AppError::Configuration {
+                        message: format!("Invalid bucket name: {}", e),
+                    })?;
+
+                let adapter = Arc::new(S3ObjectStoreAdapter::new(store.clone(), bucket_name));
+                let versioned_adapter = Arc::new(VersionedS3ObjectStoreAdapter::new(
+                    adapter.clone(),
+                    store,
+                ));
+
                 Ok((
-                    adapter.clone() as Arc<dyn ObjectStore>,
+                    adapter as Arc<dyn ObjectStore>,
                     versioned_adapter as Arc<dyn VersionedObjectStore>,
                 ))
             }
@@ -203,9 +261,30 @@ impl AppBuilder {
                 Ok((object_repo, lifecycle_repo))
             }
             RepositoryBackend::Database { connection_string } => {
-                // In a real implementation, create database repositories here
-                let object_repo = Arc::new(InMemoryObjectRepository::new()); // Fallback for now
-                let lifecycle_repo = Arc::new(InMemoryLifecycleRepository::new()); // Fallback for now
+                // Create database connection pool
+                let pool = PgPool::connect(connection_string)
+                    .await
+                    .map_err(|e| AppError::Configuration {
+                        message: format!("Failed to connect to database: {}", e),
+                    })?;
+
+                // Create SQL repositories
+                let object_repo = Arc::new(SqlObjectRepository::new(pool.clone()));
+                let lifecycle_repo = Arc::new(SqlLifecycleRepository::new(pool.clone()));
+
+                // Run migrations
+                object_repo.migrate()
+                    .await
+                    .map_err(|e| AppError::Configuration {
+                        message: format!("Failed to run object repository migrations: {}", e),
+                    })?;
+
+                lifecycle_repo.migrate()
+                    .await
+                    .map_err(|e| AppError::Configuration {
+                        message: format!("Failed to run lifecycle repository migrations: {}", e),
+                    })?;
+
                 Ok((object_repo, lifecycle_repo))
             }
         }

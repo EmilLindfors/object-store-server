@@ -55,6 +55,9 @@ pub enum StorageError {
 
     /// Generic storage error
     InternalError { message: String },
+
+    /// Storage backend error
+    StorageBackendError { message: String },
 }
 
 impl std::fmt::Display for StorageError {
@@ -121,6 +124,9 @@ impl std::fmt::Display for StorageError {
             }
             StorageError::InternalError { message } => {
                 write!(f, "Internal storage error: {}", message)
+            }
+            StorageError::StorageBackendError { message } => {
+                write!(f, "Storage backend error: {}", message)
             }
         }
     }

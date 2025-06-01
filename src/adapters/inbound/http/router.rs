@@ -51,66 +51,66 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         // Object operations
         .route("/objects", get(list_objects))
-        .route("/objects/:key", put(create_object))
-        .route("/objects/:key", get(get_object))
-        .route("/objects/:key", delete(delete_object))
-        .route("/objects/:key", head(head_object))
-        .route("/objects/:source_key/copy/:dest_key", post(copy_object))
+        .route("/objects/{key}", put(create_object))
+        .route("/objects/{key}", get(get_object))
+        .route("/objects/{key}", delete(delete_object))
+        .route("/objects/{key}", head(head_object))
+        .route("/objects/{source_key}/copy/{dest_key}", post(copy_object))
         // Versioned object operations
-        .route("/versioned-objects/:key", put(put_versioned_object))
-        .route("/versioned-objects/:key/latest", get(get_latest_object))
+        .route("/versioned-objects/{key}", put(put_versioned_object))
+        .route("/versioned-objects/{key}/latest", get(get_latest_object))
         .route(
-            "/versioned-objects/:key/versions",
+            "/versioned-objects/{key}/versions",
             get(list_object_versions),
         )
         .route(
-            "/versioned-objects/:key/versions/:version_id",
+            "/versioned-objects/{key}/versions/{version_id}",
             get(get_versioned_object),
         )
         .route(
-            "/versioned-objects/:key/versions/:version_id",
+            "/versioned-objects/{key}/versions/{version_id}",
             delete(delete_versioned_object),
         )
         .route(
-            "/versioned-objects/:key/versions/:version_id",
+            "/versioned-objects/{key}/versions/{version_id}",
             head(head_versioned_object),
         )
         .route(
-            "/versioned-objects/:source_key/versions/:source_version_id/copy/:dest_key",
+            "/versioned-objects/{source_key}/versions/{source_version_id}/copy/{dest_key}",
             post(copy_versioned_object),
         )
         .route(
-            "/versioned-objects/:key/versions/:version_id/restore",
+            "/versioned-objects/{key}/versions/{version_id}/restore",
             post(restore_version),
         )
         // Lifecycle management
         .route(
-            "/buckets/:bucket/lifecycle",
+            "/buckets/{bucket}/lifecycle",
             put(set_lifecycle_configuration),
         )
         .route(
-            "/buckets/:bucket/lifecycle",
+            "/buckets/{bucket}/lifecycle",
             get(get_lifecycle_configuration),
         )
         .route(
-            "/buckets/:bucket/lifecycle",
+            "/buckets/{bucket}/lifecycle",
             delete(delete_lifecycle_configuration),
         )
-        .route("/buckets/:bucket/lifecycle/rules", post(add_lifecycle_rule))
+        .route("/buckets/{bucket}/lifecycle/rules", post(add_lifecycle_rule))
         .route(
-            "/buckets/:bucket/lifecycle/rules/:rule_id",
+            "/buckets/{bucket}/lifecycle/rules/{rule_id}",
             delete(remove_lifecycle_rule),
         )
         .route(
-            "/buckets/:bucket/lifecycle/rules/:rule_id/enable",
+            "/buckets/{bucket}/lifecycle/rules/{rule_id}/enable",
             post(enable_lifecycle_rule),
         )
         .route(
-            "/buckets/:bucket/lifecycle/rules/:rule_id/disable",
+            "/buckets/{bucket}/lifecycle/rules/{rule_id}/disable",
             post(disable_lifecycle_rule),
         )
         .route(
-            "/buckets/:bucket/lifecycle/process",
+            "/buckets/{bucket}/lifecycle/process",
             post(process_bucket_lifecycle),
         )
         .route("/lifecycle/evaluate", post(evaluate_object_lifecycle))

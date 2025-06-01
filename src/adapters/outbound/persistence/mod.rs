@@ -1,5 +1,9 @@
 mod in_memory_lifecycle_repository;
 mod in_memory_object_repository;
+mod sql_lifecycle_repository;
+mod sql_object_repository;
 
 pub use in_memory_lifecycle_repository::InMemoryLifecycleRepository;
 pub use in_memory_object_repository::InMemoryObjectRepository;
+pub use sql_lifecycle_repository::SqlLifecycleRepository;
+pub use sql_object_repository::SqlObjectRepository;

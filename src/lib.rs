@@ -30,19 +30,23 @@ pub use domain::{
 
 // Port types - interfaces for external systems
 pub use ports::{
-    CompletedPart,
-
-    LifecycleRepository,
-
-    LifecycleService,
-    ObjectInfo,
     // Repository ports
+    LifecycleRepository,
     ObjectRepository,
-    // Storage ports
-    ObjectStore,
-    VersionedObjectStore,
     // Service ports
+    LifecycleService,
     VersioningService,
+    // Storage ports
+    storage::{
+        CompletedPart,
+        MultipartUpload,
+        ObjectInfo,
+        ObjectStore,
+        PresignedUrlMethod,
+        StorageVersionMetadata,
+        StorageVersionedObject,
+        VersionedObjectStore,
+    },
 };
 
 // Service implementations - business logic
@@ -58,15 +62,15 @@ pub use app::{
 
 // Adapter types - infrastructure implementations
 pub use adapters::outbound::storage::{
-    ApacheObjectStoreAdapter, VersionedApacheObjectStoreAdapter,
+    S3ObjectStoreAdapter, VersionedS3ObjectStoreAdapter,
 };
 
 // Public facade for easy construction
 pub mod prelude {
     pub use crate::{
-        ApacheObjectStoreAdapter, AppBuilder, AppServices, BucketName, LifecycleRepository,
+        AppBuilder, AppServices, BucketName, LifecycleRepository,
         LifecycleService, LifecycleServiceImpl, ObjectKey, ObjectRepository, ObjectServiceImpl,
-        ObjectStore, VersionId, VersionedApacheObjectStoreAdapter, VersionedObjectStore,
+        ObjectStore, VersionId, S3ObjectStoreAdapter, VersionedS3ObjectStoreAdapter, VersionedObjectStore,
         VersioningService, create_in_memory_app, create_minio_app, create_s3_app,
     };
 }

@@ -2,7 +2,6 @@
 pub mod error;
 
 // Storage implementations
-pub mod apache_object_store_adapter;
 pub mod bucket;
 pub mod lifecycle;
 pub mod lifecycle_adapter;
@@ -10,10 +9,9 @@ pub mod versioning;
 
 // Provider-specific implementations
 pub mod minio;
+pub mod s3;
 
 // Re-export key types
-pub use apache_object_store_adapter::{
-    ApacheObjectStoreAdapter, VersionedApacheObjectStoreAdapter,
-};
+pub use s3::{S3ObjectStoreAdapter, VersionedS3ObjectStoreAdapter, S3Config, create_s3_store};
 pub use error::StoreError;
 pub use versioning::VersionedStore;
