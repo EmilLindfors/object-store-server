@@ -3,14 +3,23 @@
 pub enum ValidationError {
     // ObjectKey validation errors
     EmptyObjectKey,
-    ObjectKeyTooLong { actual: usize, max: usize },
+    ObjectKeyTooLong {
+        actual: usize,
+        max: usize,
+    },
     InvalidObjectKeyCharacter(char),
     ObjectKeyStartsWithSlash,
     ObjectKeyContainsDoubleSlash,
 
     // BucketName validation errors
-    BucketNameTooShort { actual: usize, min: usize },
-    BucketNameTooLong { actual: usize, max: usize },
+    BucketNameTooShort {
+        actual: usize,
+        min: usize,
+    },
+    BucketNameTooLong {
+        actual: usize,
+        max: usize,
+    },
     BucketNameInvalidStart,
     BucketNameInvalidEnd,
     BucketNameInvalidCharacter(char),
@@ -19,13 +28,21 @@ pub enum ValidationError {
 
     // VersionId validation errors
     EmptyVersionId,
-    VersionIdTooLong { actual: usize, max: usize },
+    VersionIdTooLong {
+        actual: usize,
+        max: usize,
+    },
     InvalidVersionIdCharacter(char),
 
     // Lifecycle validation errors
     DuplicateRuleId(String),
     RuleIdTooLong(String),
     NoActionsInRule(String),
+    InvalidField {
+        field: String,
+        value: String,
+        expected: String,
+    },
 }
 
 impl std::fmt::Display for ValidationError {
@@ -103,6 +120,17 @@ impl std::fmt::Display for ValidationError {
             }
             ValidationError::NoActionsInRule(id) => {
                 write!(f, "Lifecycle rule '{}' has no actions defined", id)
+            }
+            ValidationError::InvalidField {
+                field,
+                value,
+                expected,
+            } => {
+                write!(
+                    f,
+                    "Invalid value for field '{}': '{}' (expected: {})",
+                    field, value, expected
+                )
             }
         }
     }

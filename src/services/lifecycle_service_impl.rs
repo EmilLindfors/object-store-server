@@ -723,6 +723,7 @@ mod tests {
         InMemoryLifecycleRepository, InMemoryObjectRepository,
     };
     use crate::adapters::outbound::storage::ApacheObjectStoreAdapter;
+    use crate::{Filter, VersionedApacheObjectStoreAdapter};
     use object_store::memory::InMemory;
     use std::collections::HashMap;
 
@@ -731,7 +732,7 @@ mod tests {
         let object_repo = Arc::new(InMemoryObjectRepository::new());
         let memory_store = Arc::new(InMemory::new());
         let object_store = Arc::new(ApacheObjectStoreAdapter::new(memory_store.clone()));
-        let versioned_store = Arc::new(ApacheObjectStoreAdapter::new(memory_store));
+        let versioned_store = Arc::new(VersionedApacheObjectStoreAdapter::new(memory_store));
 
         LifecycleServiceImpl::new(lifecycle_repo, object_repo, object_store, versioned_store)
     }
@@ -746,7 +747,7 @@ mod tests {
             rules: vec![LifecycleRule {
                 id: "test-rule".to_string(),
                 status: RuleStatus::Enabled,
-                filter: crate::domain::models::Filter::with_prefix("logs/".to_string()),
+                filter: Filter::new().with_prefix("logs/".to_string()),
                 expiration_days: Some(30),
                 ..Default::default()
             }],
@@ -774,7 +775,7 @@ mod tests {
             rules: vec![LifecycleRule {
                 id: "expire-old-logs".to_string(),
                 status: RuleStatus::Enabled,
-                filter: crate::domain::models::Filter::with_prefix("logs/".to_string()),
+                filter: Filter::new().with_prefix("logs/".to_string()),
                 expiration_days: Some(1), // 1 day for testing
                 ..Default::default()
             }],
@@ -809,7 +810,7 @@ mod tests {
         let rule = LifecycleRule {
             id: "new-rule".to_string(),
             status: RuleStatus::Enabled,
-            filter: crate::domain::models::Filter::with_prefix("temp/".to_string()),
+            filter: Filter::new().with_prefix("temp/".to_string()),
             expiration_days: Some(7),
             ..Default::default()
         };

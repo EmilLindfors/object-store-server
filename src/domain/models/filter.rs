@@ -20,11 +20,45 @@ impl Filter {
     }
 
     /// Create a filter with just a prefix
-    pub fn with_prefix(prefix: String) -> Self {
-        Self {
-            prefix: Some(prefix),
-            ..Default::default()
+    pub fn with_prefix(&mut self, prefix: String) -> Self {
+        self.prefix = Some(prefix);
+        self.clone()
+    }
+
+    pub fn with_tags(&mut self, tags: HashMap<String, String>) -> Self {
+        self.tags = tags;
+        self.clone()
+    }
+
+    /// Create a filter with size constraints
+    pub fn with_size_constraints(
+        &mut self,
+        greater_than: Option<u64>,
+        less_than: Option<u64>,
+    ) -> Self {
+        self.object_size_greater_than = greater_than;
+        self.object_size_less_than = less_than;
+        self.clone()
+    }
+
+    /// get the prefix if it exists
+    pub fn get_prefix(&self) -> Option<&String> {
+        self.prefix.as_ref()
+    }
+    /// Get the tags if they exist
+    pub fn get_tags(&self) -> Option<HashMap<String, String>> {
+        if self.tags.is_empty() {
+            None
+        } else {
+            Some(self.tags.clone())
         }
+    }
+    /// Get the size constraints if they exist
+    pub fn get_object_size_greater_than(&self) -> Option<u64> {
+        self.object_size_greater_than
+    }
+    pub fn get_object_size_less_than(&self) -> Option<u64> {
+        self.object_size_less_than
     }
 
     /// Check if this filter matches an object

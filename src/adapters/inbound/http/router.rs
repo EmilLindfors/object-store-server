@@ -35,7 +35,7 @@ use std::sync::Arc;
 
 use crate::{
     ports::services::{LifecycleService, ObjectService, VersioningService},
-    services::{LifecycleServiceImpl, VersioningServiceImpl},
+    services::{LifecycleServiceImpl, ObjectServiceImpl, VersioningServiceImpl},
 };
 
 /// Application state containing all services
@@ -119,7 +119,7 @@ pub fn create_router(state: AppState) -> Router {
 }
 
 /// Create a router with just object operations
-pub fn create_object_router() -> Router<ObjectService> {
+pub fn create_object_router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_objects))
         .route("/:key", put(create_object))
@@ -130,7 +130,7 @@ pub fn create_object_router() -> Router<ObjectService> {
 }
 
 /// Create a router with just lifecycle operations
-pub fn create_lifecycle_router() -> Router<LifecycleServiceImpl> {
+pub fn create_lifecycle_router() -> Router<AppState> {
     Router::new()
         .route(
             "/buckets/:bucket/lifecycle",
@@ -165,7 +165,7 @@ pub fn create_lifecycle_router() -> Router<LifecycleServiceImpl> {
 }
 
 /// Create a router with just versioning operations
-pub fn create_versioning_router() -> Router<VersioningServiceImpl> {
+pub fn create_versioning_router() -> Router<AppState> {
     Router::new()
         .route("/:key", put(put_versioned_object))
         .route("/:key/latest", get(get_latest_object))
@@ -186,9 +186,12 @@ pub fn create_versioning_router() -> Router<VersioningServiceImpl> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::outbound::{
-        persistence::{InMemoryLifecycleRepository, InMemoryObjectRepository},
-        storage::ApacheObjectStoreAdapter,
+    use crate::{
+        VersionedApacheObjectStoreAdapter,
+        adapters::outbound::{
+            persistence::{InMemoryLifecycleRepository, InMemoryObjectRepository},
+            storage::ApacheObjectStoreAdapter,
+        },
     };
     use axum_test::TestServer;
     use object_store::memory::InMemory;
@@ -197,25 +200,26 @@ mod tests {
     async fn create_test_app_state() -> AppState {
         let memory_store = Arc::new(InMemory::new());
         let object_store = Arc::new(ApacheObjectStoreAdapter::new(memory_store.clone()));
-        let versioned_store = Arc::new(ApacheObjectStoreAdapter::new(memory_store));
+        let versioned_store = Arc::new(VersionedApacheObjectStoreAdapter::new(memory_store));
         let object_repo = Arc::new(InMemoryObjectRepository::new());
         let lifecycle_repo = Arc::new(InMemoryLifecycleRepository::new());
 
-        let object_service = crate::services::ObjectService::new(
+        let object_service = Arc::new(ObjectServiceImpl::new(
+            object_repo.clone(),
+            object_store.clone(),
+        ));
+
+        let lifecycle_service = Arc::new(LifecycleServiceImpl::new(
+            lifecycle_repo,
             object_repo.clone(),
             object_store.clone(),
             versioned_store.clone(),
-        );
+        ));
 
-        let lifecycle_service = LifecycleServiceImpl::new(
-            lifecycle_repo,
-            object_repo,
-            object_store.clone(),
-            versioned_store.clone(),
-        );
-
-        let versioning_service =
-            crate::services::VersioningServiceImpl::new(versioned_store, object_store);
+        let versioning_service = Arc::new(crate::services::VersioningServiceImpl::new(
+            object_repo.clone(),
+            versioned_store,
+        ));
 
         AppState {
             object_service,
@@ -236,7 +240,7 @@ mod tests {
     #[tokio::test]
     async fn test_object_router() {
         let state = create_test_app_state().await;
-        let object_router = create_object_router().with_state(state.object_service);
+        let object_router = create_object_router().with_state(state);
 
         // Test that we can create a test server with the router
         let _server = TestServer::new(object_router).unwrap();

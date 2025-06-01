@@ -472,8 +472,8 @@ mod tests {
         let adapter = VersionedApacheObjectStoreAdapter::new(store);
 
         let key = ObjectKey::new("test/key".to_string()).unwrap();
-        let version1 = VersionId::new();
-        let version2 = VersionId::new();
+        let version1 = VersionId::generate();
+        let version2 = VersionId::generate();
         let data1 = b"test data v1".to_vec();
         let data2 = b"test data v2".to_vec();
 

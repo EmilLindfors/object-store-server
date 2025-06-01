@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 object_store = { version = "0.12", features = ["aws"] }
-axum = { version = "0.7", features = ["multipart"] }
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
-tower = { version = "0.4", features = ["util"] }
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 bytes = "1.5"
 futures = "0.3"
@@ -31,4 +31,5 @@ md5 = "0.7"
 [dev-dependencies]
 async-stream = "0.3.5"
 urlencoding = "2.1.0"
+axum-test = "18.0.0-rc3"
 

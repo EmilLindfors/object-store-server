@@ -170,7 +170,7 @@ mod tests {
             rules: vec![LifecycleRule {
                 id: "rule1".to_string(),
                 status: RuleStatus::Enabled,
-                filter: Filter::with_prefix("logs/".to_string()),
+                filter: Filter::new().with_prefix("logs/".to_string()),
                 expiration_days: Some(30),
                 ..Default::default()
             }],
@@ -195,7 +195,7 @@ mod tests {
             rules: vec![LifecycleRule {
                 id: "rule1".to_string(),
                 status: RuleStatus::Enabled,
-                filter: Filter::with_prefix("logs/".to_string()),
+                filter: Filter::new().with_prefix("logs/".to_string()),
                 expiration_days: Some(30),
                 ..Default::default()
             }],

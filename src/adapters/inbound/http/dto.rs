@@ -2,10 +2,15 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::domain::{
-    errors::{LifecycleError, StorageError, ValidationError},
-    models::{Filter, LifecycleConfiguration, LifecycleRule, LifecycleStorageClass, RuleStatus},
-    value_objects::{BucketName, ObjectKey},
+use crate::{
+    adapters::outbound::storage,
+    domain::{
+        errors::{LifecycleError, StorageError, ValidationError},
+        models::{
+            Filter, LifecycleConfiguration, LifecycleRule, LifecycleStorageClass, RuleStatus,
+        },
+        value_objects::{BucketName, ObjectKey},
+    },
 };
 
 /// DTO for object information
@@ -55,20 +60,31 @@ pub struct LifecycleRuleDto {
     // Expiration settings
     pub expiration_days: Option<u32>,
     pub expiration_date: Option<DateTime<Utc>>,
-
-    // Transition settings
-    pub transition_days: Option<u32>,
-    pub transition_storage_class: Option<String>,
+    pub expiration_expired_object_delete_marker: Option<bool>,
+    pub expiration_expired_object_all_versions: Option<bool>,
 
     // Delete marker expiration
     pub del_marker_expiration_days: Option<u32>,
 
-    // Non-current version settings
+    // All versions expiration
+    pub all_versions_expiration_days: Option<u32>,
+    pub all_versions_expiration_delete_marker: Option<bool>,
+
+    // Transition settings
+    pub transition_days: Option<u32>,
+    pub transition_date: Option<DateTime<Utc>>,
+    pub transition_storage_class: Option<String>,
+
+    // Non-current version expiration
     pub noncurrent_version_expiration_noncurrent_days: Option<u32>,
+    pub noncurrent_version_expiration_newer_versions: Option<u32>,
+
+    // Non-current version transition
     pub noncurrent_version_transition_noncurrent_days: Option<u32>,
     pub noncurrent_version_transition_storage_class: Option<String>,
+    pub noncurrent_version_transition_newer_versions: Option<u32>,
 
-    // Multipart upload cleanup
+    // Abort incomplete multipart uploads
     pub abort_incomplete_multipart_upload_days_after_initiation: Option<u32>,
 }
 
@@ -180,22 +196,24 @@ impl TryFrom<&str> for BucketName {
 
 impl From<FilterDto> for Filter {
     fn from(dto: FilterDto) -> Self {
-        let mut filter = Filter::default();
-
+        let mut filter = Filter::new();
         if let Some(prefix) = dto.prefix {
             filter = filter.with_prefix(prefix);
         }
 
         if let Some(tags) = dto.tags {
             filter = filter.with_tags(tags);
+        } else {
+            let mut filter = Filter::new();
+            filter = Filter::new();
         }
 
         if let Some(size) = dto.object_size_greater_than {
-            filter = filter.with_object_size_greater_than(size);
+            filter = filter.with_size_constraints(Some(size), None);
         }
 
         if let Some(size) = dto.object_size_less_than {
-            filter = filter.with_object_size_less_than(size);
+            filter = filter.with_size_constraints(None, Some(size));
         }
 
         filter
@@ -206,7 +224,7 @@ impl From<Filter> for FilterDto {
     fn from(filter: Filter) -> Self {
         FilterDto {
             prefix: filter.get_prefix().map(|s| s.to_string()),
-            tags: filter.get_tags().cloned(),
+            tags: filter.get_tags().clone(),
             object_size_greater_than: filter.get_object_size_greater_than(),
             object_size_less_than: filter.get_object_size_less_than(),
         }
@@ -231,25 +249,11 @@ impl TryFrom<LifecycleRuleDto> for LifecycleRule {
 
         let transition_storage_class = dto
             .transition_storage_class
-            .map(|s| LifecycleStorageClass::from_str(&s))
-            .transpose()
-            .map_err(|e| ValidationError::InvalidField {
-                field: "transition_storage_class".to_string(),
-                value: dto.transition_storage_class.unwrap_or_default(),
-                expected: e.to_string(),
-            })?;
+            .map(|s| LifecycleStorageClass::from_str(&s));
 
         let noncurrent_version_transition_storage_class = dto
             .noncurrent_version_transition_storage_class
-            .map(|s| LifecycleStorageClass::from_str(&s))
-            .transpose()
-            .map_err(|e| ValidationError::InvalidField {
-                field: "noncurrent_version_transition_storage_class".to_string(),
-                value: dto
-                    .noncurrent_version_transition_storage_class
-                    .unwrap_or_default(),
-                expected: e.to_string(),
-            })?;
+            .map(|s| LifecycleStorageClass::from_str(&s));
 
         Ok(LifecycleRule {
             id: dto.id,
@@ -257,14 +261,24 @@ impl TryFrom<LifecycleRuleDto> for LifecycleRule {
             filter: dto.filter.into(),
             expiration_days: dto.expiration_days,
             expiration_date: dto.expiration_date,
-            transition_days: dto.transition_days,
-            transition_storage_class,
+            expiration_expired_object_delete_marker: dto.expiration_expired_object_delete_marker,
+            expiration_expired_object_all_versions: dto.expiration_expired_object_all_versions,
             del_marker_expiration_days: dto.del_marker_expiration_days,
+            all_versions_expiration_days: dto.all_versions_expiration_days,
+            all_versions_expiration_delete_marker: dto.all_versions_expiration_delete_marker,
+            transition_days: dto.transition_days,
+            transition_date: dto.transition_date,
+            transition_storage_class: transition_storage_class,
             noncurrent_version_expiration_noncurrent_days: dto
                 .noncurrent_version_expiration_noncurrent_days,
+            noncurrent_version_expiration_newer_versions: dto
+                .noncurrent_version_expiration_newer_versions,
             noncurrent_version_transition_noncurrent_days: dto
                 .noncurrent_version_transition_noncurrent_days,
-            noncurrent_version_transition_storage_class,
+            noncurrent_version_transition_storage_class:
+                noncurrent_version_transition_storage_class,
+            noncurrent_version_transition_newer_versions: dto
+                .noncurrent_version_transition_newer_versions,
             abort_incomplete_multipart_upload_days_after_initiation: dto
                 .abort_incomplete_multipart_upload_days_after_initiation,
         })
@@ -296,6 +310,15 @@ impl From<LifecycleRule> for LifecycleRuleDto {
                 .map(|sc| sc.as_str().to_string()),
             abort_incomplete_multipart_upload_days_after_initiation: rule
                 .abort_incomplete_multipart_upload_days_after_initiation,
+            expiration_expired_object_delete_marker: rule.expiration_expired_object_delete_marker,
+            expiration_expired_object_all_versions: rule.expiration_expired_object_all_versions,
+            all_versions_expiration_days: rule.all_versions_expiration_days,
+            all_versions_expiration_delete_marker: rule.all_versions_expiration_delete_marker,
+            noncurrent_version_expiration_newer_versions: rule
+                .noncurrent_version_expiration_newer_versions,
+            noncurrent_version_transition_newer_versions: rule
+                .noncurrent_version_transition_newer_versions,
+            transition_date: rule.transition_date,
         }
     }
 }

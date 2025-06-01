@@ -10,8 +10,9 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
-    adapters::inbound::http::dto::{
-        ErrorResponseDto, ListVersionsResponseDto, SuccessResponseDto, VersionedObjectDto,
+    adapters::inbound::http::{
+        AppState,
+        dto::{ErrorResponseDto, ListVersionsResponseDto, SuccessResponseDto, VersionedObjectDto},
     },
     domain::{
         models::{CreateObjectRequest, DeleteVersionRequest, GetObjectRequest},
@@ -29,7 +30,7 @@ pub struct ListVersionsQuery {
 
 /// Handle creating a versioned object
 pub async fn put_versioned_object(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path(key): Path<String>,
     headers: HeaderMap,
     body: Bytes,
@@ -57,7 +58,8 @@ pub async fn put_versioned_object(
     };
 
     // Create versioned object
-    let versioned_object = versioning_service
+    let versioned_object = app_state
+        .versioning_service
         .create_versioned_object(request)
         .await
         .map_err(|e| {
@@ -76,7 +78,7 @@ pub async fn put_versioned_object(
 
 /// Handle getting a specific version of an object
 pub async fn get_versioned_object(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path((key, version_id)): Path<(String, String)>,
 ) -> Result<Response<Body>, (StatusCode, Json<ErrorResponseDto>)> {
     // Create object key and version ID
@@ -107,10 +109,14 @@ pub async fn get_versioned_object(
     };
 
     // Get the versioned object
-    let versioned_object = versioning_service.get_object(request).await.map_err(|e| {
-        let status_code = StatusCode::from(e.clone());
-        (status_code, Json(ErrorResponseDto::from_storage_error(e)))
-    })?;
+    let versioned_object = app_state
+        .versioning_service
+        .get_object(request)
+        .await
+        .map_err(|e| {
+            let status_code = StatusCode::from(e.clone());
+            (status_code, Json(ErrorResponseDto::from_storage_error(e)))
+        })?;
 
     // Return the object data with version headers
     let content_type = versioned_object
@@ -129,7 +135,7 @@ pub async fn get_versioned_object(
 
 /// Handle getting the latest version of an object
 pub async fn get_latest_object(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path(key): Path<String>,
 ) -> Result<Response<Body>, (StatusCode, Json<ErrorResponseDto>)> {
     // Create object key
@@ -149,10 +155,14 @@ pub async fn get_latest_object(
         version_id: None,
     };
 
-    let versioned_object = versioning_service.get_object(request).await.map_err(|e| {
-        let status_code = StatusCode::from(e.clone());
-        (status_code, Json(ErrorResponseDto::from_storage_error(e)))
-    })?;
+    let versioned_object = app_state
+        .versioning_service
+        .get_object(request)
+        .await
+        .map_err(|e| {
+            let status_code = StatusCode::from(e.clone());
+            (status_code, Json(ErrorResponseDto::from_storage_error(e)))
+        })?;
 
     // Return the object data with version headers
     let content_type = versioned_object
@@ -171,7 +181,7 @@ pub async fn get_latest_object(
 
 /// Handle deleting a specific version
 pub async fn delete_versioned_object(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path((key, version_id)): Path<(String, String)>,
 ) -> Result<(StatusCode, Json<SuccessResponseDto>), (StatusCode, Json<ErrorResponseDto>)> {
     // Create object key and version ID
@@ -202,7 +212,8 @@ pub async fn delete_versioned_object(
     };
 
     // Delete the version
-    versioning_service
+    app_state
+        .versioning_service
         .delete_version(request)
         .await
         .map_err(|e| {
@@ -218,7 +229,7 @@ pub async fn delete_versioned_object(
 
 /// Handle listing all versions of an object
 pub async fn list_object_versions(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path(key): Path<String>,
     Query(params): Query<ListVersionsQuery>,
 ) -> Result<Json<ListVersionsResponseDto>, (StatusCode, Json<ErrorResponseDto>)> {
@@ -234,7 +245,8 @@ pub async fn list_object_versions(
     })?;
 
     // Get all versions
-    let versions = versioning_service
+    let versions = app_state
+        .versioning_service
         .list_versions(&object_key)
         .await
         .map_err(|e| {
@@ -276,7 +288,7 @@ pub async fn list_object_versions(
 
 /// Handle copying a specific version to a new object
 pub async fn copy_versioned_object(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path((source_key, source_version_id, dest_key)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseDto>)> {
     // Create object keys and version ID
@@ -311,7 +323,8 @@ pub async fn copy_versioned_object(
     })?;
 
     // Copy the version
-    let new_version_id = versioning_service
+    let new_version_id = app_state
+        .versioning_service
         .copy_version(&source_object_key, &source_version, &dest_object_key)
         .await
         .map_err(|e| {
@@ -332,7 +345,7 @@ pub async fn copy_versioned_object(
 
 /// Handle checking if a specific version exists
 pub async fn head_versioned_object(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path((key, version_id)): Path<(String, String)>,
 ) -> Result<(StatusCode, HeaderMap), (StatusCode, Json<ErrorResponseDto>)> {
     // Create object key and version ID
@@ -357,7 +370,8 @@ pub async fn head_versioned_object(
     })?;
 
     // Check if version exists
-    let exists = versioning_service
+    let exists = app_state
+        .versioning_service
         .version_exists(&object_key, &version)
         .await
         .map_err(|e| {
@@ -381,7 +395,7 @@ pub async fn head_versioned_object(
 
 /// Handle restoring a previous version as the latest
 pub async fn restore_version(
-    State(versioning_service): State<Arc<dyn VersioningService>>,
+    State(app_state): State<AppState>,
     Path((key, version_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseDto>)> {
     // Create object key and version ID
@@ -406,7 +420,8 @@ pub async fn restore_version(
     })?;
 
     // Restore the version by copying it as a new version
-    let new_version_id = versioning_service
+    let new_version_id = app_state
+        .versioning_service
         .copy_version(&object_key, &version, &object_key)
         .await
         .map_err(|e| {
