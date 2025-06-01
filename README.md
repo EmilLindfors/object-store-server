@@ -1,12 +1,12 @@
-# Object Store Bridge
+# Object Store Server
 
-A Rust library that extends Apache Arrow's `object_store` crate with advanced features including:
+A Rust HTTP server that extends Apache Arrow's `object_store` crate with advanced features including:
 
 1. **Versioning**: Automatic tracking and management of object versions
 2. **Lifecycle Management**: Expiration and transition rules for objects
 3. **Axum Web Framework Integration**: Tower middleware for HTTP API access
 
-The library serves as a bridge between object storage systems (like S3, Azure Blob Storage, etc.) and web applications built with Axum, providing a RESTful API for object operations.
+The server provides a RESTful HTTP API for object storage operations with support for multiple backends (S3, MinIO, Azure Blob Storage, etc.) built with Axum web framework.
 
 ## Features
 
@@ -21,7 +21,7 @@ The library serves as a bridge between object storage systems (like S3, Azure Bl
 ```rust
 use axum::Router;
 use object_store::aws::AmazonS3Builder;
-use object_store_bridge::{
+use object_store_server::{
     lifecycle::{LifecycleConfiguration, LifecycleRule, RuleStatus, ExpirationConfig},
     middleware::{ObjectStoreLayer, ObjectStoreService, create_object_store_router},
 };
@@ -100,7 +100,7 @@ cargo test --test minio_tests -- --ignored
 
 ## Project Status
 
-The core library successfully compiles with the latest dependencies:
+The core server successfully compiles with the latest dependencies:
 - object_store 0.12 with aws feature
 - axum 0.7 with multipart feature
 - Tower and hyper ecosystem
@@ -109,7 +109,7 @@ The core library successfully compiles with the latest dependencies:
 
 ### Path Handling
 
-The library separates bucket and object key handling:
+The server separates bucket and object key handling:
 
 1. **API Routes**: Use paths in the format `/storage/{bucket}/{key}` for routing
 2. **Internal Paths**: When constructing object paths, we **do not** include the bucket name as it's already configured in the object store client
@@ -119,7 +119,7 @@ This ensures objects are created at the correct path within the storage bucket r
 ## Building and Running
 
 ```bash
-# Build the library
+# Build the server
 cargo build
 
 # Run tests
